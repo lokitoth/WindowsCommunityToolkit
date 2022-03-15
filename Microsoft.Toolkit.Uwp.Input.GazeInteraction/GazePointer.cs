@@ -19,6 +19,8 @@ using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
 
+using MSR.IGGazing.GazeBackends.GazeDeviceProxy;
+
 namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 {
     /// <summary>
@@ -363,8 +365,10 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
             InitializeHistogram();
 
-            _devices = new List<GazeDevicePreview>();
-            _watcher = GazeInputSourcePreview.CreateWatcher();
+            _gazeInputProxy = new GazeInputProxy(GazeInputBackend.RealGazeDevice);
+
+            _devices = new List<GazeDeviceProxy>();
+            _watcher = _gazeInputProxy.CreateWatcher();
             _watcher.Added += OnDeviceAdded;
             _watcher.Removed += OnDeviceRemoved;
             _watcher.Start();
@@ -419,7 +423,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 {
                     if (_gazeInputSource == null)
                     {
-                        _gazeInputSource = GazeInputSourcePreview.GetForCurrentView();
+                        _gazeInputSource = _gazeInputProxy.GetForCurrentView();
                     }
 
                     if (_gazeInputSource != null)
@@ -691,16 +695,16 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
         }
 
         private void OnGazeEntered(
-            GazeInputSourcePreview provider,
-            GazeEnteredPreviewEventArgs args)
+            GazeInputSourceProxy provider,
+            GazeEnteredProxyEventArgs args)
         {
             // Debug.WriteLine("Entered at %ld", args.CurrentPoint.Timestamp);
             _gazeCursor.IsGazeEntered = true;
         }
 
         private void OnGazeMoved(
-            GazeInputSourcePreview provider,
-            GazeMovedPreviewEventArgs args)
+            GazeInputSourceProxy provider,
+            IGazeMovedProxyEventArgs args)
         {
             if (!_isShuttingDown)
             {
@@ -722,8 +726,8 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
         }
 
         private void OnGazeExited(
-            GazeInputSourcePreview provider,
-            GazeExitedPreviewEventArgs args)
+            GazeInputSourceProxy provider,
+            GazeExitedProxyEventArgs args)
         {
             // Debug.WriteLine("Exited at %ld", args.CurrentPoint.Timestamp);
             _gazeCursor.IsGazeEntered = false;
@@ -824,7 +828,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             RaiseGazePointerEvent(null, PointerState.Enter, EyesOffDelay);
         }
 
-        private void OnDeviceAdded(GazeDeviceWatcherPreview sender, GazeDeviceWatcherAddedPreviewEventArgs args)
+        private void OnDeviceAdded(GazeDeviceWatcherProxy sender, GazeDeviceWatcherAddedProxyEventArgs args)
         {
             _devices.Add(args.Device);
 
@@ -836,7 +840,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             }
         }
 
-        private void OnDeviceRemoved(GazeDeviceWatcherPreview sender, GazeDeviceWatcherRemovedPreviewEventArgs args)
+        private void OnDeviceRemoved(GazeDeviceWatcherProxy sender, GazeDeviceWatcherRemovedProxyEventArgs args)
         {
             var index = 0;
             while (index < _devices.Count && _devices.ElementAt(index).Id != args.Device.Id)
@@ -865,8 +869,9 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
         private readonly GazeCursor _gazeCursor;
 
-        private readonly GazeDeviceWatcherPreview _watcher;
-        private readonly List<GazeDevicePreview> _devices;
+        private readonly GazeInputProxy _gazeInputProxy;
+        private readonly GazeDeviceWatcherProxy _watcher;
+        private readonly List<GazeDeviceProxy> _devices;
 
         private readonly GazeEventArgs _gazeEventArgs = new GazeEventArgs();
 
@@ -888,7 +893,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
         // saved timestamp
         private TimeSpan _lastTimestamp;
 
-        private GazeInputSourcePreview _gazeInputSource;
+        private GazeInputSourceProxy _gazeInputSource;
 
         private TimeSpan _defaultFixation = DEFAULT_FIXATION_DELAY;
         private TimeSpan _defaultDwell = DEFAULT_DWELL_DELAY;
