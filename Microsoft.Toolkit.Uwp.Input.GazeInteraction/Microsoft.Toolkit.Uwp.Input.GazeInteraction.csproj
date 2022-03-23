@@ -13,6 +13,14 @@
     <PackageTags>Input;Gaze;Eye;Tracker;EyeTracker</PackageTags>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|uap10.0|AnyCPU'">
+    <Optimize>False</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|uap10.0|AnyCPU'">
+    <Optimize>False</Optimize>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\GazeBackends\GazeBackends.csproj" />
     <ProjectReference Include="..\..\..\MLIntegration\MLIntegration.csproj" /> 

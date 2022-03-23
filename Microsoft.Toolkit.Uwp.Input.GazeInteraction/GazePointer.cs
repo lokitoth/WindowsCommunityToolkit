@@ -370,7 +370,9 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
             _gazeInputProxy = new GazeInputProxy(GazeInputBackend.RealGazeDevice);
 
-            _dwellAgentStateMachine = new DwellAgentStateMachine();
+            string tempPath = System.IO.Path.GetTempFileName();
+            _dwellAgentStateMachine = new DwellAgentStateMachine(new RandomExplorationLogger(tempPath, LogType.PlainJson));
+            Debug.WriteLine($"Logging at {tempPath}");
 
             _devices = new List<GazeDeviceProxy>();
             _watcher = _gazeInputProxy.CreateWatcher();
@@ -466,6 +468,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 var nextStateTime = GetElementStateDelay(target.TargetElement, PointerState.Enter);
 
                 target.Reset(nextStateTime);
+                _dwellAgentStateMachine.ExitGaze();
             }
         }
 
@@ -770,6 +773,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             CheckIfExiting(fa.Timestamp);
 
             PointerState nextState = (PointerState)((int)targetItem.ElementState + 1);
+            Debug.WriteLine($"nextState = {nextState}");
 
             // Debug.WriteLine(targetItem.TargetElement.ToString());
             // Debug.WriteLine("\tState={0}, Elapsed={1}, NextStateTime={2}", targetItem.ElementState, targetItem.ElapsedTime, targetItem.NextStateTime);
@@ -792,10 +796,17 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     nextState = (PointerState)((int)nextState + 1);     // nextState++
                     var stateDelay = GetElementStateDelay(targetItem.TargetElement, nextState);
 
-                    if (nextState == PointerState.Fixation)
+                    if (targetItem.ElementState == PointerState.Enter)
                     {
+                        _dwellAgentStateMachine.EnterGaze();
+                    }
+                    
+                    if (targetItem.ElementState == PointerState.Fixation)
+                    {
+                        var oldStateDelay = stateDelay;
                         // TODO: Filter out IsSwitchEnabled states? See line 832
                         stateDelay = this._dwellAgentStateMachine.FixateGazeAndGetDwellTime(currentGazeMoveData, stateDelay);
+                        Debug.WriteLine($"Rethinking state delay for {targetItem.ElementState}=>{nextState} transition: Was {oldStateDelay}; now {stateDelay}");
                     }
 
                     targetItem.NextStateTime += stateDelay;
