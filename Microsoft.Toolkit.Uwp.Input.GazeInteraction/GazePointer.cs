@@ -725,7 +725,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                         var eyeGazePosition = point.EyeGazePosition;
 
                         collector.TryCollectGazePoint(point);
-                        ProcessGazePoint(new TimeSpan((long)point.Timestamp * 10), position.Value);
+                        ProcessGazePoint(new TimeSpan((long)point.Timestamp * 10), position.Value, collector.AssembleGazeMove());
                     }
                     else
                     {
