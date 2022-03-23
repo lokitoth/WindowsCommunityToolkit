@@ -785,7 +785,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     if (targetItem.ElementState == PointerState.Fixation)
                     {
                         // Transitioning from Fixation => Dwell
-                        this._dwellAgentStateMachine.FixateGaze();
+                        this._dwellAgentStateMachine.EnterGaze();
                     }
 
                     targetItem.ElementState = nextState;
@@ -795,7 +795,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     if (nextState == PointerState.Fixation)
                     {
                         // TODO: Filter out IsSwitchEnabled states? See line 832
-                        stateDelay = this._dwellAgentStateMachine.EnterGazeAndGetDwellTime(currentGazeMoveData, stateDelay);
+                        stateDelay = this._dwellAgentStateMachine.FixateGazeAndGetDwellTime(currentGazeMoveData, stateDelay);
                     }
 
                     targetItem.NextStateTime += stateDelay;
