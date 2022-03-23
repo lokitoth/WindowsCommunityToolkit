@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\GazeBackends\GazeBackends.csproj" />
+    <ProjectReference Include="..\..\..\MLIntegration\MLIntegration.csproj" /> 
   </ItemGroup>
 
 </Project>

@@ -20,6 +20,7 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
 
 using MSR.IGGazing.GazeBackends.GazeDeviceProxy;
+using MSR.IGGazing.MLIntegration;
 
 namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 {
@@ -252,6 +253,8 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             {
                 case PointerState.Dwell:
                 case PointerState.DwellRepeat:
+
+
                     _maxHistoryTime = new TimeSpan(Math.Max(_maxHistoryTime.Ticks, 2 * ticks.Ticks));
                     break;
             }
@@ -366,6 +369,8 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             InitializeHistogram();
 
             _gazeInputProxy = new GazeInputProxy(GazeInputBackend.RealGazeDevice);
+
+            _dwellAgentStateMachine = new DwellAgentStateMachine();
 
             _devices = new List<GazeDeviceProxy>();
             _watcher = _gazeInputProxy.CreateWatcher();
@@ -613,6 +618,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     _currentlyFixatedElement = null;
 
                     RaiseGazePointerEvent(targetItem, PointerState.Exit, targetItem.ElapsedTime);
+                    this._dwellAgentStateMachine.ExitGaze();
                     targetItem.GiveFeedback();
 
                     _activeHitTargetTimes.RemoveAt(index);
@@ -708,6 +714,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
         {
             if (!_isShuttingDown)
             {
+                GazeMoveCollector collector = new GazeMoveCollector();
                 var intermediatePoints = args.GetIntermediatePoints();
                 foreach (var point in intermediatePoints)
                 {
@@ -715,6 +722,9 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     if (position != null)
                     {
                         _gazeCursor.IsGazeEntered = true;
+                        var eyeGazePosition = point.EyeGazePosition;
+
+                        collector.TryCollectGazePoint(point);
                         ProcessGazePoint(new TimeSpan((long)point.Timestamp * 10), position.Value);
                     }
                     else
@@ -733,7 +743,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             _gazeCursor.IsGazeEntered = false;
         }
 
-        private void ProcessGazePoint(TimeSpan timestamp, Point position)
+        private void ProcessGazePoint(TimeSpan timestamp, Point position, GazeMoveData currentGazeMoveData)
         {
             var ea = new GazeFilterArgs(position, timestamp);
 
@@ -772,9 +782,23 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 // to continuously emit the DwellRepeat event
                 if (nextState != PointerState.DwellRepeat)
                 {
+                    if (targetItem.ElementState == PointerState.Fixation)
+                    {
+                        // Transitioning from Fixation => Dwell
+                        this._dwellAgentStateMachine.FixateGaze();
+                    }
+
                     targetItem.ElementState = nextState;
                     nextState = (PointerState)((int)nextState + 1);     // nextState++
-                    targetItem.NextStateTime += GetElementStateDelay(targetItem.TargetElement, nextState);
+                    var stateDelay = GetElementStateDelay(targetItem.TargetElement, nextState);
+
+                    if (nextState == PointerState.Fixation)
+                    {
+                        // TODO: Filter out IsSwitchEnabled states? See line 832
+                        stateDelay = this._dwellAgentStateMachine.EnterGazeAndGetDwellTime(currentGazeMoveData, stateDelay);
+                    }
+
+                    targetItem.NextStateTime += stateDelay;
 
                     if (targetItem.ElementState == PointerState.Dwell)
                     {
@@ -789,6 +813,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
                 if (targetItem.ElementState == PointerState.Dwell)
                 {
+                    this._dwellAgentStateMachine.Activate();
                     targetItem.RepeatCount++;
                     if (targetItem.MaxDwellRepeatCount < targetItem.RepeatCount)
                     {
@@ -804,7 +829,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     // We are about to transition into the Dwell state
                     // If switch input is enabled, make sure dwell never completes
                     // via eye gaze
-                    if (IsSwitchEnabled)
+                    if (IsSwitchEnabled) // refer from line 797, update if moved from 832
                     {
                         // Don't allow the next state (Dwell) to progress
                         targetItem.NextStateTime = new TimeSpan(long.MaxValue);
@@ -894,6 +919,11 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
         private TimeSpan _lastTimestamp;
 
         private GazeInputSourceProxy _gazeInputSource;
+
+        private DwellAgentStateMachine _dwellAgentStateMachine;
+
+        public DwellAgentStateMachine DwellStateMachine => _dwellAgentStateMachine;
+
 
         private TimeSpan _defaultFixation = DEFAULT_FIXATION_DELAY;
         private TimeSpan _defaultDwell = DEFAULT_DWELL_DELAY;
