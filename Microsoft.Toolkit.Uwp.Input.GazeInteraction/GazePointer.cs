@@ -746,6 +746,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
         private void ProcessGazePoint(TimeSpan timestamp, Point position, GazeMoveData currentGazeMoveData)
         {
+            _dwellAgentStateMachine.CollectGazeMovePoint((float)position.X, (float)position.Y, timestamp);
             var ea = new GazeFilterArgs(position, timestamp);
 
             var fa = Filter.Update(ea);
@@ -771,12 +772,14 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             CheckIfExiting(fa.Timestamp);
 
             PointerState nextState = (PointerState)((int)targetItem.ElementState + 1);
-            Debug.WriteLine($"nextState = {nextState}");
+            //Debug.WriteLine($"nextState = {nextState}");
 
             // Debug.WriteLine(targetItem.TargetElement.ToString());
             // Debug.WriteLine("\tState={0}, Elapsed={1}, NextStateTime={2}", targetItem.ElementState, targetItem.ElapsedTime, targetItem.NextStateTime);
             if (targetItem.ElapsedTime > targetItem.NextStateTime)
             {
+                Debug.WriteLine($"Transitioning '{targetItem.TargetElement}' ({targetItem.ElementState} => {nextState} @{targetItem.ElapsedTime} (vs {targetItem.NextStateTime})");
+
                 var prevStateTime = targetItem.NextStateTime;
                 ////Debug.WriteLine(prevStateTime);
 
@@ -784,10 +787,10 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 // to continuously emit the DwellRepeat event
                 if (nextState != PointerState.DwellRepeat)
                 {
-                    if (targetItem.ElementState == PointerState.Fixation)
+                    if (targetItem.ElementState == PointerState.Fixation )
                     {
                         // Transitioning from Fixation => Dwell
-                        this._dwellAgentStateMachine.EnterGaze();
+                        // this._dwellAgentStateMachine.EnterGaze();
                     }
 
                     targetItem.ElementState = nextState;
