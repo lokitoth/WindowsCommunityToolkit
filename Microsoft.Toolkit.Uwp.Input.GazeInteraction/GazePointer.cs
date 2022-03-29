@@ -370,9 +370,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
             _gazeInputProxy = new GazeInputProxy(GazeInputBackend.RealGazeDevice);
 
-            string tempPath = System.IO.Path.GetTempFileName();
-            _dwellAgentStateMachine = new DwellAgentStateMachine(new RandomExplorationLogger(tempPath, LogType.PlainJson));
-            Debug.WriteLine($"Logging at {tempPath}");
+            _dwellAgentStateMachine = DefaultConfiguration.CreateDefaultStateMachine();
 
             _devices = new List<GazeDeviceProxy>();
             _watcher = _gazeInputProxy.CreateWatcher();
