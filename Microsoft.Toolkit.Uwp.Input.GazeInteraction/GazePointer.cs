@@ -22,6 +22,7 @@ using Windows.UI.Xaml.Media;
 using MSR.IGGazing.GazeBackends.GazeDeviceProxy;
 using MSR.IGGazing.MLIntegration;
 using MSR.IGGazing.MLIntegration.Trajectory;
+using MSR.IGGazing.MLIntegration.Dwell;
 
 namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 {
