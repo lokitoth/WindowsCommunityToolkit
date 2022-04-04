@@ -21,6 +21,7 @@ using Windows.UI.Xaml.Media;
 
 using MSR.IGGazing.GazeBackends.GazeDeviceProxy;
 using MSR.IGGazing.MLIntegration;
+using MSR.IGGazing.MLIntegration.Trajectory;
 
 namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 {
@@ -371,6 +372,9 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             _gazeInputProxy = new GazeInputProxy(GazeInputBackend.RealGazeDevice);
 
             _dwellAgentStateMachine = DefaultConfiguration.CreateDefaultStateMachine();
+            _trajectoryService = DefaultConfiguration.CreateDefaultTrajectoryService();
+
+            this.Filter = new GazeTrajectoryFilter(this._trajectoryService);
 
             _devices = new List<GazeDeviceProxy>();
             _watcher = _gazeInputProxy.CreateWatcher();
@@ -779,6 +783,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             if (targetItem.ElapsedTime > targetItem.NextStateTime)
             {
                 Debug.WriteLine($"Transitioning '{targetItem.TargetElement}' ({targetItem.ElementState} => {nextState} @{targetItem.ElapsedTime} (vs {targetItem.NextStateTime})");
+                this._trajectoryService.LogGazeState((GazeState)nextState, (ulong)fa.Timestamp.Ticks, targetItem.TargetElement);
 
                 var prevStateTime = targetItem.NextStateTime;
                 ////Debug.WriteLine(prevStateTime);
@@ -826,6 +831,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 if (targetItem.ElementState == PointerState.Dwell)
                 {
                     this._dwellAgentStateMachine.Activate();
+                    this._trajectoryService.LogGazeActivated((ulong)fa.Timestamp.Ticks, targetItem.TargetElement);
                     targetItem.RepeatCount++;
                     if (targetItem.MaxDwellRepeatCount < targetItem.RepeatCount)
                     {
@@ -933,6 +939,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
         private GazeInputSourceProxy _gazeInputSource;
 
         private DwellAgentStateMachine _dwellAgentStateMachine;
+        private ITrajectoryService _trajectoryService;
 
         public DwellAgentStateMachine DwellStateMachine => _dwellAgentStateMachine;
 
