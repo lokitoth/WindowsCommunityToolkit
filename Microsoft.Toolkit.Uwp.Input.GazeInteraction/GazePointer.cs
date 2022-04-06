@@ -369,7 +369,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
             InitializeHistogram();
 
-            _gazeInputProxy = new GazeInputProxy(GazeInputBackend.RealGazeDevice);
+            _gazeInputProxy = DefaultConfiguration.ConfigureGazeInput();
 
             _gazePointerIntegration = DefaultConfiguration.CreateIntegrationEndpoint();
 
