@@ -8,7 +8,13 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Windows.Devices.Input.Preview;
+
+using MSR.IGGazing.GazeBackends.GazeDeviceProxy;
+using MSR.IGGazing.MLIntegration;
+using MSR.IGGazing.MLIntegration.Dwell;
+using MSR.IGGazing.MLIntegration.Element;
+using MSR.IGGazing.MLIntegration.Trajectory;
+
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.System;
@@ -18,11 +24,6 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
-
-using MSR.IGGazing.GazeBackends.GazeDeviceProxy;
-using MSR.IGGazing.MLIntegration;
-using MSR.IGGazing.MLIntegration.Trajectory;
-using MSR.IGGazing.MLIntegration.Dwell;
 
 namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 {
@@ -255,8 +256,6 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             {
                 case PointerState.Dwell:
                 case PointerState.DwellRepeat:
-
-
                     _maxHistoryTime = new TimeSpan(Math.Max(_maxHistoryTime.Ticks, 2 * ticks.Ticks));
                     break;
             }
@@ -372,10 +371,9 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
             _gazeInputProxy = new GazeInputProxy(GazeInputBackend.RealGazeDevice);
 
-            _dwellAgentStateMachine = DefaultConfiguration.CreateDefaultStateMachine();
-            _trajectoryService = DefaultConfiguration.CreateDefaultTrajectoryService();
+            _gazePointerIntegration = DefaultConfiguration.CreateIntegrationEndpoint();
 
-            this.Filter = new GazeTrajectoryFilter(this._trajectoryService);
+            this.Filter = new GazeTrajectoryFilter(this._gazePointerIntegration);
 
             _devices = new List<GazeDeviceProxy>();
             _watcher = _gazeInputProxy.CreateWatcher();
@@ -471,7 +469,8 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 var nextStateTime = GetElementStateDelay(target.TargetElement, PointerState.Enter);
 
                 target.Reset(nextStateTime);
-                _dwellAgentStateMachine.ExitGaze();
+
+                //_dwellAgentStateMachine.ExitGaze();
             }
         }
 
@@ -624,7 +623,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     _currentlyFixatedElement = null;
 
                     RaiseGazePointerEvent(targetItem, PointerState.Exit, targetItem.ElapsedTime);
-                    this._dwellAgentStateMachine.ExitGaze();
+                    this._gazePointerIntegration.ObservePointerExit((ulong)curTimestamp.Ticks, targetItem.TargetElement.ToElementInfo());
                     targetItem.GiveFeedback();
 
                     _activeHitTargetTimes.RemoveAt(index);
@@ -751,11 +750,12 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
         private void ProcessGazePoint(TimeSpan timestamp, Point position, GazeMoveData currentGazeMoveData)
         {
-            _dwellAgentStateMachine.CollectGazeMovePoint((float)position.X, (float)position.Y, timestamp);
             var ea = new GazeFilterArgs(position, timestamp);
 
             var fa = Filter.Update(ea);
             _gazeCursor.Position = fa.Location;
+
+            _gazePointerIntegration.ObserveFixedGazeCoordinates(fa.Location.X, fa.Location.Y, (ulong)fa.Timestamp.Ticks);
 
             if (_gazeEventCount != 0)
             {
@@ -776,43 +776,46 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             // this ensures that all exit events are fired before enter event
             CheckIfExiting(fa.Timestamp);
 
+            // Debug.WriteLine($"nextState = {nextState}");
             PointerState nextState = (PointerState)((int)targetItem.ElementState + 1);
-            //Debug.WriteLine($"nextState = {nextState}");
+            if (nextState == PointerState.Enter)
+            {
+                Debug.WriteLine("Entering Gaze?");
+            }
 
             // Debug.WriteLine(targetItem.TargetElement.ToString());
             // Debug.WriteLine("\tState={0}, Elapsed={1}, NextStateTime={2}", targetItem.ElementState, targetItem.ElapsedTime, targetItem.NextStateTime);
             if (targetItem.ElapsedTime > targetItem.NextStateTime)
             {
                 Debug.WriteLine($"Transitioning '{targetItem.TargetElement}' ({targetItem.ElementState} => {nextState} @{targetItem.ElapsedTime} (vs {targetItem.NextStateTime})");
-                this._trajectoryService.LogGazeState((GazeState)nextState, (ulong)fa.Timestamp.Ticks, targetItem.TargetElement);
 
-                var prevStateTime = targetItem.NextStateTime;
+                ////this._trajectoryService.LogGazeState((GazeState)nextState, (ulong)fa.Timestamp.Ticks, targetItem.TargetElement);
+                ////var prevStateTime = targetItem.NextStateTime;
                 ////Debug.WriteLine(prevStateTime);
+                var prevState = targetItem.ElementState;
 
                 // prevent targetItem from ever actually transitioning into the DwellRepeat state so as
                 // to continuously emit the DwellRepeat event
                 if (nextState != PointerState.DwellRepeat)
                 {
-                    if (targetItem.ElementState == PointerState.Fixation )
-                    {
-                        // Transitioning from Fixation => Dwell
-                        // this._dwellAgentStateMachine.EnterGaze();
-                    }
-
                     targetItem.ElementState = nextState;
                     nextState = (PointerState)((int)nextState + 1);     // nextState++
                     var stateDelay = GetElementStateDelay(targetItem.TargetElement, nextState);
 
-                    if (targetItem.ElementState == PointerState.Enter)
-                    {
-                        _dwellAgentStateMachine.EnterGaze();
-                    }
-                    
+                    // This is a little ugly, and it is doing a ton of work... In the ideal world, this would be split in two - one for the
+                    // observation, and one for the delay time request, similar to how the position observation works (fix/observe).
+                    var oldStateDelay = stateDelay;
+                    this._gazePointerIntegration.TransitionPointerStateSetNextDuration(
+                        (GazeState)targetItem.ElementState,
+                        (GazeState)nextState,
+                        (ulong)fa.Timestamp.Ticks,
+                        targetItem.TargetElement.ToElementInfo(),
+                        currentGazeMoveData,
+                        ref stateDelay);
+
                     if (targetItem.ElementState == PointerState.Fixation)
                     {
-                        var oldStateDelay = stateDelay;
-                        // TODO: Filter out IsSwitchEnabled states? See line 832
-                        stateDelay = this._dwellAgentStateMachine.FixateGazeAndGetDwellTime(currentGazeMoveData, stateDelay);
+                        // TODO: Filter out IsSwitchEnabled states? See line 860
                         Debug.WriteLine($"Rethinking state delay for {targetItem.ElementState}=>{nextState} transition: Was {oldStateDelay}; now {stateDelay}");
                     }
 
@@ -827,8 +830,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 {
                     // The nextState == PointerState.DwellRepeat, means that currentState == PointerState.Dwell. Since the time just
                     // elapsed, it means we just activated the control, so send the activation signal to the ML stack.
-                    this._dwellAgentStateMachine.Activate();
-                    this._trajectoryService.LogGazeActivated((ulong)fa.Timestamp.Ticks, targetItem.TargetElement);
+                    this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.TargetElement.ToElementInfo());
 
                     // move the NextStateTime by one dwell period, while continuing to stay in Dwell state
                     targetItem.NextStateTime += GetElementStateDelay(targetItem.TargetElement, PointerState.DwellRepeat);
@@ -851,7 +853,8 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     // We are about to transition into the Dwell state
                     // If switch input is enabled, make sure dwell never completes
                     // via eye gaze
-                    if (IsSwitchEnabled) // refer from line 797, update if moved from 832
+                    // refer from line 818, update if moved from 860
+                    if (IsSwitchEnabled)
                     {
                         // Don't allow the next state (Dwell) to progress
                         targetItem.NextStateTime = new TimeSpan(long.MaxValue);
@@ -942,11 +945,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
         private GazeInputSourceProxy _gazeInputSource;
 
-        private DwellAgentStateMachine _dwellAgentStateMachine;
-        private ITrajectoryService _trajectoryService;
-
-        public DwellAgentStateMachine DwellStateMachine => _dwellAgentStateMachine;
-
+        private IGazePointerIntegration _gazePointerIntegration;
 
         private TimeSpan _defaultFixation = DEFAULT_FIXATION_DELAY;
         private TimeSpan _defaultDwell = DEFAULT_DWELL_DELAY;
