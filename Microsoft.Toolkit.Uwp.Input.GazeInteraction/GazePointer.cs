@@ -470,7 +470,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
                 target.Reset(nextStateTime);
 
-                //_dwellAgentStateMachine.ExitGaze();
+                ////_dwellAgentStateMachine.ExitGaze();
             }
         }
 
