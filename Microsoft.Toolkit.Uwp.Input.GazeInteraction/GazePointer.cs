@@ -833,7 +833,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 {
                     // The nextState == PointerState.DwellRepeat, means that currentState == PointerState.Dwell. Since the time just
                     // elapsed, it means we just activated the control, so send the activation signal to the ML stack.
-                    //this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.TargetElement.ToElementInfo());
+                    ////this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.TargetElement.ToElementInfo());
 
                     // move the NextStateTime by one dwell period, while continuing to stay in Dwell state
                     targetItem.NextStateTime += GetElementStateDelay(targetItem.TargetElement, PointerState.DwellRepeat);
