@@ -9,7 +9,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-using MSR.IGGazing.GazeBackends.GazeDeviceProxy;
+using MSR.IGGazing.GazeBackends;
 using MSR.IGGazing.MLIntegration;
 using MSR.IGGazing.MLIntegration.Dwell;
 using MSR.IGGazing.MLIntegration.Element;
