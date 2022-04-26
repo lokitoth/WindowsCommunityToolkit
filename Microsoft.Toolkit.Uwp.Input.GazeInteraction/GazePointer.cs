@@ -661,7 +661,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
         };
         */
 
-        private void RaiseGazePointerEvent(GazeTargetItem target, PointerState state, TimeSpan elapsedTime)
+        private bool RaiseGazePointerEvent(GazeTargetItem target, PointerState state, TimeSpan elapsedTime)
         {
             var control = target?.TargetElement;
 
@@ -701,8 +701,11 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 if (!handled)
                 {
                     target.Invoke();
+                    return true;
                 }
             }
+
+            return false;
         }
 
         private void OnGazeEntered(
@@ -787,7 +790,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             // Debug.WriteLine("\tState={0}, Elapsed={1}, NextStateTime={2}", targetItem.ElementState, targetItem.ElapsedTime, targetItem.NextStateTime);
             if (targetItem.ElapsedTime > targetItem.NextStateTime)
             {
-                Debug.WriteLine($"Transitioning '{targetItem.TargetElement}' ({targetItem.ElementState} => {nextState} @{targetItem.ElapsedTime} (vs {targetItem.NextStateTime})");
+                Debug.WriteLine($"Transitioning '{targetItem.TargetElement}' ({targetItem.ElementState} => {nextState} @{fa.Timestamp.Ticks} elapsed = {targetItem.ElapsedTime} (vs {targetItem.NextStateTime}) ");
 
                 ////this._trajectoryService.LogGazeState((GazeState)nextState, (ulong)fa.Timestamp.Ticks, targetItem.TargetElement);
                 ////var prevStateTime = targetItem.NextStateTime;
@@ -830,7 +833,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 {
                     // The nextState == PointerState.DwellRepeat, means that currentState == PointerState.Dwell. Since the time just
                     // elapsed, it means we just activated the control, so send the activation signal to the ML stack.
-                    this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.TargetElement.ToElementInfo());
+                    //this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.TargetElement.ToElementInfo());
 
                     // move the NextStateTime by one dwell period, while continuing to stay in Dwell state
                     targetItem.NextStateTime += GetElementStateDelay(targetItem.TargetElement, PointerState.DwellRepeat);
@@ -861,7 +864,12 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     }
                 }
 
-                RaiseGazePointerEvent(targetItem, targetItem.ElementState, targetItem.ElapsedTime);
+                if (RaiseGazePointerEvent(targetItem, targetItem.ElementState, targetItem.ElapsedTime))
+                {
+                    // true => We "Invoke"d the control, which presumably is an activation
+                    Debug.WriteLine($"Invoke sent for '{targetItem.TargetElement}' @{fa.Timestamp.Ticks}");
+                    this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.TargetElement.ToElementInfo());
+                }
             }
 
             targetItem.GiveFeedback();
