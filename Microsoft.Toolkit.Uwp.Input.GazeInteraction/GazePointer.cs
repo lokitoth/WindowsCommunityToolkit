@@ -868,6 +868,10 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 {
                     // true => We "Invoke"d the control, which presumably is an activation
                     Debug.WriteLine($"Invoke sent for '{targetItem.TargetElement}' @{fa.Timestamp.Ticks}");
+
+                    // TODO: Move the animation code into MLIntegration entirely - requires the IRef stuff from Dwell rewrite
+                    ElementHighlighting.ObserveActivation(targetItem.TargetElement);
+
                     this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.TargetElement.ToElementInfo());
                 }
             }
