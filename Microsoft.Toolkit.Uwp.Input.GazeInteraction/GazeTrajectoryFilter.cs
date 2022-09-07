@@ -13,9 +13,9 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
     internal class GazeTrajectoryFilter : IGazeFilter
     {
-        private IGazePointerIntegration gazePointerIntegration;
+        private IGazePointerIntegrationEx gazePointerIntegration;
 
-        public GazeTrajectoryFilter(IGazePointerIntegration gazePointerIntegration)
+        public GazeTrajectoryFilter(IGazePointerIntegrationEx gazePointerIntegration)
         {
             this.gazePointerIntegration = gazePointerIntegration;
         }
@@ -27,7 +27,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
         public GazeFilterArgs Update(GazeFilterArgs args)
         {
             double x = args.Location.X, y = args.Location.Y;
-            ulong ticks = (ulong)args.Timestamp.Ticks;
+            ulong ticks = args.Timestamp.ToGazeTicks();
 
             this.gazePointerIntegration.FilterGazeCoordinates(ref x, ref y, ticks);
 

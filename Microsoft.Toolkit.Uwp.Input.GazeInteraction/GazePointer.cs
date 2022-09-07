@@ -623,7 +623,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     _currentlyFixatedElement = null;
 
                     RaiseGazePointerEvent(targetItem, PointerState.Exit, targetItem.ElapsedTime);
-                    this._gazePointerIntegration.ObservePointerExit((ulong)curTimestamp.Ticks, targetItem.TargetElement.ToElementInfo());
+                    this._gazePointerIntegration.ObservePointerExit(curTimestamp.Ticks.ToGazeTicks(), targetItem.TargetElement.ToElementRef());
                     targetItem.GiveFeedback();
 
                     _activeHitTargetTimes.RemoveAt(index);
@@ -732,7 +732,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                         _gazeCursor.IsGazeEntered = true;
                         var eyeGazePosition = point.EyeGazePosition;
 
-                        collector.TryCollectGazePoint(point);
+                        ////collector.TryCollectGazePoint(point);
                         ProcessGazePoint(new TimeSpan((long)point.Timestamp * 10), position.Value, collector.AssembleGazeMove());
                     }
                     else
@@ -753,12 +753,14 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
         private void ProcessGazePoint(TimeSpan timestamp, Point position, GazeMoveData currentGazeMoveData)
         {
+            _gazePointerIntegration.StartProcessingPoint(timestamp.ToGazeTicks());
+
             var ea = new GazeFilterArgs(position, timestamp);
 
             var fa = Filter.Update(ea);
             _gazeCursor.Position = fa.Location;
 
-            _gazePointerIntegration.ObserveFixedGazeCoordinates(fa.Location.X, fa.Location.Y, (ulong)fa.Timestamp.Ticks);
+            _gazePointerIntegration.ObserveFixedGazeCoordinates(fa.Location.X, fa.Location.Y, timestamp.ToGazeTicks());
 
             if (_gazeEventCount != 0)
             {
@@ -771,6 +773,9 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             }
 
             var targetItem = ResolveHitTarget(fa.Location, fa.Timestamp);
+
+            _gazePointerIntegration.ObserveResolvedHitTest(timestamp.ToGazeTicks(), targetItem.TargetElement.ToElementRef());
+
             Debug.Assert(targetItem != null, "targetItem is null when processing gaze point");
 
             // Debug.WriteLine("ProcessGazePoint. [{0}, {1}], {2}", (int)fa.Location.X, (int)fa.Location.Y, fa.Timestamp);
@@ -786,13 +791,13 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 Debug.WriteLine("Entering Gaze?");
             }
 
-            // Debug.WriteLine(targetItem.TargetElement.ToString());
+            // Debug.WriteLine(targetItem.Element.ToString());
             // Debug.WriteLine("\tState={0}, Elapsed={1}, NextStateTime={2}", targetItem.ElementState, targetItem.ElapsedTime, targetItem.NextStateTime);
             if (targetItem.ElapsedTime > targetItem.NextStateTime)
             {
-                Debug.WriteLine($"Transitioning '{targetItem.TargetElement}' ({targetItem.ElementState} => {nextState} @{fa.Timestamp.Ticks} elapsed = {targetItem.ElapsedTime} (vs {targetItem.NextStateTime}) ");
+                Debug.WriteLine($"Transitioning '{targetItem.TargetElement}' ({targetItem.ElementState} => {nextState} @{timestamp} elapsed = {targetItem.ElapsedTime} (vs {targetItem.NextStateTime}) ");
 
-                ////this._trajectoryService.LogGazeState((GazeState)nextState, (ulong)fa.Timestamp.Ticks, targetItem.TargetElement);
+                ////this._trajectoryService.LogGazeState((GazeState)nextState, (ulong)fa.Timestamp.Ticks, targetItem.Element);
                 ////var prevStateTime = targetItem.NextStateTime;
                 ////Debug.WriteLine(prevStateTime);
                 var prevState = targetItem.ElementState;
@@ -808,13 +813,16 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     // This is a little ugly, and it is doing a ton of work... In the ideal world, this would be split in two - one for the
                     // observation, and one for the delay time request, similar to how the position observation works (fix/observe).
                     var oldStateDelay = stateDelay;
+
+                    var stateDelayTicks = stateDelay.ToGazeTicks();
                     this._gazePointerIntegration.TransitionPointerStateSetNextDuration(
                         (GazeState)targetItem.ElementState,
                         (GazeState)nextState,
-                        (ulong)fa.Timestamp.Ticks,
-                        targetItem.TargetElement.ToElementInfo(),
+                        timestamp.ToGazeTicks(),
+                        targetItem.TargetElement.ToElementRef(),
                         currentGazeMoveData,
-                        ref stateDelay);
+                        ref stateDelayTicks);
+                    stateDelay = stateDelayTicks.ToTimeSpan();
 
                     if (targetItem.ElementState == PointerState.Fixation)
                     {
@@ -833,7 +841,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 {
                     // The nextState == PointerState.DwellRepeat, means that currentState == PointerState.Dwell. Since the time just
                     // elapsed, it means we just activated the control, so send the activation signal to the ML stack.
-                    ////this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.TargetElement.ToElementInfo());
+                    ////this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.Element.ToElementInfo());
 
                     // move the NextStateTime by one dwell period, while continuing to stay in Dwell state
                     targetItem.NextStateTime += GetElementStateDelay(targetItem.TargetElement, PointerState.DwellRepeat);
@@ -867,19 +875,25 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 if (RaiseGazePointerEvent(targetItem, targetItem.ElementState, targetItem.ElapsedTime))
                 {
                     // true => We "Invoke"d the control, which presumably is an activation
-                    Debug.WriteLine($"Invoke sent for '{targetItem.TargetElement}' @{fa.Timestamp.Ticks}");
+                    Debug.WriteLine($"Invoke sent for '{targetItem.TargetElement}' @{timestamp.ToGazeTicks()}");
 
                     // TODO: Move the animation code into MLIntegration entirely - requires the IRef stuff from Dwell rewrite
                     ElementHighlighting.ObserveActivation(targetItem.TargetElement);
 
-                    this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.TargetElement.ToElementInfo());
+                    this._gazePointerIntegration.ObservePointerActivation(timestamp.ToGazeTicks(), targetItem.TargetElement.ToElementRef());
                 }
             }
 
             targetItem.GiveFeedback();
 
+            // Restart the "idle" timer, since the user is moving gaze around (i.e. there are GazePoints to process)
             _eyesOffTimer.Start();
+
+            // Capture the last timestamp to use to determine what the delta to be assigned for state transitions
+            // will be (in ResolveHitTarget)
             _lastTimestamp = fa.Timestamp;
+
+            _gazePointerIntegration.EndProcessingPoint(timestamp.ToGazeTicks());
         }
 
         private void OnEyesOff(object sender, object ea)
@@ -957,7 +971,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
         private GazeInputSourceProxy _gazeInputSource;
 
-        private IGazePointerIntegration _gazePointerIntegration;
+        private IGazePointerIntegrationEx _gazePointerIntegration;
 
         private TimeSpan _defaultFixation = DEFAULT_FIXATION_DELAY;
         private TimeSpan _defaultDwell = DEFAULT_DWELL_DELAY;
