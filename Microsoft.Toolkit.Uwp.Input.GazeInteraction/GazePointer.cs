@@ -751,6 +751,25 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
             _gazeCursor.IsGazeEntered = false;
         }
 
+        private ulong InterceptStateTransitionDelayCalculation(
+            GazeState activeState,
+            GazeState nextState,
+            TimeSpan timestamp,
+            GazeTargetItem targetItem,
+            GazeMoveData currentGazeMoveData,
+            ulong stateDelayTicksBaseline)
+        {
+            this._gazePointerIntegration.TransitionPointerStateSetNextDuration(
+                        activeState,
+                        nextState,
+                        timestamp.ToGazeTicks(),
+                        targetItem.TargetElement.ToElementRef(),
+                        currentGazeMoveData,
+                        ref stateDelayTicksBaseline);
+
+            return stateDelayTicksBaseline;
+        }
+
         private void ProcessGazePoint(TimeSpan timestamp, Point position, GazeMoveData currentGazeMoveData)
         {
             _gazePointerIntegration.StartProcessingPoint(timestamp.ToGazeTicks());
@@ -813,15 +832,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     // This is a little ugly, and it is doing a ton of work... In the ideal world, this would be split in two - one for the
                     // observation, and one for the delay time request, similar to how the position observation works (fix/observe).
                     var oldStateDelay = stateDelay;
-
-                    var stateDelayTicks = stateDelay.ToGazeTicks();
-                    this._gazePointerIntegration.TransitionPointerStateSetNextDuration(
-                        (GazeState)targetItem.ElementState,
-                        (GazeState)nextState,
-                        timestamp.ToGazeTicks(),
-                        targetItem.TargetElement.ToElementRef(),
-                        currentGazeMoveData,
-                        ref stateDelayTicks);
+                    var stateDelayTicks = InterceptStateTransitionDelayCalculation((GazeState)targetItem.ElementState, (GazeState)nextState, timestamp, targetItem, currentGazeMoveData, stateDelay.ToGazeTicks());
                     stateDelay = stateDelayTicks.ToTimeSpan();
 
                     if (targetItem.ElementState == PointerState.Fixation)
@@ -834,7 +845,8 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
                     if (targetItem.ElementState == PointerState.Dwell)
                     {
-                        targetItem.NextStateTime += GetElementStateDelay(targetItem.TargetElement, GazeInput.RepeatDelayDurationProperty, _defaultDwellRepeatDelay);
+                       var stateDelayRepeat = GetElementStateDelay(targetItem.TargetElement, GazeInput.RepeatDelayDurationProperty, _defaultDwellRepeatDelay);
+                       targetItem.NextStateTime += InterceptStateTransitionDelayCalculation(GazeState.Dwell, GazeState.DwellRepeat, timestamp, targetItem, currentGazeMoveData, stateDelayRepeat.ToGazeTicks()).ToTimeSpan();
                     }
                 }
                 else
@@ -844,7 +856,8 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     ////this._gazePointerIntegration.ObservePointerActivation((ulong)fa.Timestamp.Ticks, targetItem.Element.ToElementInfo());
 
                     // move the NextStateTime by one dwell period, while continuing to stay in Dwell state
-                    targetItem.NextStateTime += GetElementStateDelay(targetItem.TargetElement, PointerState.DwellRepeat);
+                    var stateDelayRepeat = GetElementStateDelay(targetItem.TargetElement, PointerState.DwellRepeat);
+                    targetItem.NextStateTime += InterceptStateTransitionDelayCalculation((GazeState)targetItem.ElementState, (GazeState)nextState, timestamp, targetItem, currentGazeMoveData, stateDelayRepeat.ToGazeTicks()).ToTimeSpan();
                 }
 
                 if (targetItem.ElementState == PointerState.Dwell)
