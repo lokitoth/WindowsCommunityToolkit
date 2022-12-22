@@ -849,9 +849,9 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                         // this is the first one, and the platform adds an addition delay for this one repeat case. This is
                         // set by the RepeatDelayDuration.Subsequent repeats happen after every period of DwellRepeatDuration.
                         // A control is invoked repeatedly only if MaxDwellRepeatCount is set to greater than zero.
-                        targetItem.NextStateTime += GetElementStateDelay(targetItem.TargetElement, GazeInput.RepeatDelayDurationProperty, _defaultDwellRepeatDelay);
-                        ////var stateDelayRepeat = GetElementStateDelay(targetItem.TargetElement, GazeInput.RepeatDelayDurationProperty, _defaultDwellRepeatDelay);
-                        ////targetItem.NextStateTime += InterceptStateTransitionDelayCalculation(GazeState.Dwell, GazeState.DwellRepeat, timestamp, targetItem, currentGazeMoveData, stateDelayRepeat.ToGazeTicks()).ToTimeSpan();
+                        //targetItem.NextStateTime += GetElementStateDelay(targetItem.TargetElement, GazeInput.RepeatDelayDurationProperty, _defaultDwellRepeatDelay);
+                        var stateDelayRepeat = GetElementStateDelay(targetItem.TargetElement, GazeInput.RepeatDelayDurationProperty, _defaultDwellRepeatDelay);
+                        targetItem.NextStateTime += InterceptStateTransitionDelayCalculation(GazeState.Dwell, GazeState.DwellRepeat, timestamp, targetItem, currentGazeMoveData, stateDelayRepeat.ToGazeTicks()).ToTimeSpan();
                     }
                 }
                 else
