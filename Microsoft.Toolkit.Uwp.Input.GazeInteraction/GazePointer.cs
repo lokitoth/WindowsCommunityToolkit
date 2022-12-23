@@ -371,7 +371,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 
             _gazeInputProxy = DefaultConfiguration.ConfigureGazeInput();
 
-            _gazePointerIntegration = DefaultConfiguration.CreateIntegrationEndpoint();
+            _gazePointerIntegration = DefaultConfiguration.CreateIntegrationEndpoint(this._gazeCursor);
 
             this.Filter = new GazeTrajectoryFilter(this._gazePointerIntegration);
 

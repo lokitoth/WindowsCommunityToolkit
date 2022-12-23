@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using MSR.IGGazing.MLIntegration;
 using System.Linq;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -12,7 +13,7 @@ using Windows.UI.Xaml.Media;
 
 namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
 {
-    internal class GazeCursor
+    internal class GazeCursor : IGazeCursor
     {
         private const int DEFAULT_CURSOR_RADIUS = 5;
         private const bool DEFAULT_CURSOR_VISIBILITY = true;
@@ -114,7 +115,7 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                 return _gazePopup.Child as FrameworkElement;
             }
         }
-
+        
         internal GazeCursor()
         {
             _gazePopup = new Popup
@@ -161,6 +162,15 @@ namespace Microsoft.Toolkit.Uwp.Input.GazeInteraction
                     _gazePopup.IsOpen = false;
                     _gazePopup.IsOpen = true;
                 }
+            }
+        }
+
+        public void SetColor(byte r, byte g, byte b, byte a)
+        {
+            var shapeElement = this.CursorElement as Windows.UI.Xaml.Shapes.Shape;
+            if (shapeElement != null)
+            {
+                shapeElement.Fill = new SolidColorBrush(Color.FromArgb(a, r, g, b));
             }
         }
 
